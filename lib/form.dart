@@ -1,12 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:hackaton_fiap_mobile/login.dart';
+import 'package:http/http.dart';
 import 'http_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:intl/intl.dart';
 import 'package:form_builder_file_picker/form_builder_file_picker.dart';
+import 'package:path/path.dart';
+import 'package:async/async.dart';
 
 class MyFormPage extends StatelessWidget {
   static const id = '/form';
@@ -17,6 +22,7 @@ class MyFormPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        resizeToAvoidBottomInset: false,
     body: SafeArea(
         minimum: const EdgeInsets.all(20),
         child: Column(
@@ -27,7 +33,7 @@ class MyFormPage extends StatelessWidget {
           child: Column(
             children: <Widget>[
               FormBuilderTextField(
-                name: 'name',
+                name: 'nome',
                 decoration: const InputDecoration(
                   labelText:
                   'Nome do Usuário',
@@ -39,7 +45,7 @@ class MyFormPage extends StatelessWidget {
                 keyboardType: TextInputType.number,
               ),
               FormBuilderTextField(
-                name: 'product',
+                name: 'produto',
                 decoration: const InputDecoration(
                   labelText:
                   'Produto',
@@ -53,22 +59,22 @@ class MyFormPage extends StatelessWidget {
                 keyboardType: TextInputType.number,
               ),
               FormBuilderDateTimePicker(
-                name: 'date',
+                name: 'data',
                 inputType: InputType.date,
                 decoration: const InputDecoration(
                   labelText: 'Data da compra',
                 ),
               ),
               FormBuilderDropdown(
-                name: 'estado',
+                name: 'cidade',
                 decoration: const InputDecoration(
                   labelText: 'Estado',
                 ),
                 allowClear: true,
-                hint: const Text('Selecione o Estado'),
+                hint: const Text('Selecione a Cidade'),
                 validator: FormBuilderValidators.compose(
                     [FormBuilderValidators.required()]),
-                items: ['Rio de Janeiro', 'Brasília', 'São Paulo']
+                items: ['Belo Horizonte', 'Brasília', 'Fortaleza' ,'Recife', 'Rio de Janeiro', 'Salvador',  'São Paulo']
                     .map((gender) => DropdownMenuItem(
                   value: gender,
                   child: Text('$gender'),
@@ -76,7 +82,7 @@ class MyFormPage extends StatelessWidget {
                     .toList(),
               ),
               FormBuilderTextField(
-                name: 'description',
+                name: 'problema',
                 keyboardType: TextInputType.multiline,
                 maxLines: null,
                 decoration: const InputDecoration(
@@ -91,10 +97,10 @@ class MyFormPage extends StatelessWidget {
                 ]),
               ),
               FormBuilderFilePicker(
-                name: 'images',
+                name: 'anexo',
                 decoration: const InputDecoration(labelText: 'Anexos'),
                 maxFiles: null,
-                allowMultiple: true,
+                allowMultiple: false,
                 previewImages: true,
                 onChanged: (val) => debugPrint(val.toString()),
                 selector: Row(
@@ -143,17 +149,48 @@ class MyFormPage extends StatelessWidget {
                   "Enviar",
                   style: TextStyle(color: Colors.white),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   try {
                     _formKey.currentState!.save();
                     if (_formKey.currentState!.validate()) {
-                      print(_formKey.currentState!.value);
-                      _formSuccessFeedback(context);
+                      var formData = _formKey.currentState!.value;
+                      var url = Uri.parse('http://10.0.2.2:8090/reclamacao/add');
+
+                      var data =  <String, dynamic>{};
+                      data['nome'] = formData["nome"];
+                      data['produto'] = formData["produto"];
+                      data['data'] = formData["data"].toString().split(" ")[0];
+                      data['cidade'] = formData["cidade"];
+                      data['problema'] = formData["problema"];
+
+                      var response = await post(url,headers: {"Content-Type": "application/json"}, body: jsonEncode(data));
+
+
+                      if (response.statusCode < 300) {
+                        var responseBody = jsonDecode(response.body);
+                        var id = responseBody["id"];
+                        var imageUrl = Uri.parse('http://10.0.2.2:8091/reclamacao/$id');
+                        var length = await formData['anexo'][0].size;
+                        var request = MultipartRequest("POST", imageUrl);
+                        var multipartFile = await MultipartFile.fromPath("fileProduto", formData['anexo'][0].path);
+                        request.files.add(multipartFile);
+                        var response2 = await request.send();
+
+                        if (response2.statusCode < 300) {
+                        _formSuccessFeedback(context);
+                        } else {
+                          _formErrorFeedback(context);
+                        }
+                      } else {
+                        _formErrorFeedback(context);
+                      }
+
                     } else {
                       print("validation failed");
                       _formErrorFeedback(context);
                     }
                   } catch(_) {
+                    print(_);
                     _formErrorFeedback(context, message: 'Favor preencher todos os campos!');
                   }
                 },
