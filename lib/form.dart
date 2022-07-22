@@ -5,7 +5,6 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:hackaton_fiap_mobile/login.dart';
 import 'package:http/http.dart';
-import 'http_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:rflutter_alert/rflutter_alert.dart';
 import 'package:intl/intl.dart';
